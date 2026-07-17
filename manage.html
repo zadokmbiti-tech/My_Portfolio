@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Manage Projects — Portfolio Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0c0f1a;
+    --surface:  #131726;
+    --surface2: #1b2035;
+    --border:   rgba(255,255,255,0.08);
+    --accent:   #4f8ef7;
+    --accent2:  #f7954f;
+    --text:     #e2e6f0;
+    --muted:    #6b7490;
+    --danger:   #f75f5f;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.6;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.6rem;
+    margin-bottom: 2rem;
+  }
+  .panel h2 { font-size: 1.05rem; margin-bottom: 1.1rem; }
+
+  label { display: block; font-size: .8rem; color: var(--muted); margin: .9rem 0 .35rem; }
+  input, textarea, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .65rem .8rem;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .92rem;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  .btn {
+    display: inline-block;
+    margin-top: 1.3rem;
+    padding: .7rem 1.4rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .9rem;
+  }
+  .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); margin-left: .6rem; }
+  .btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+
+  .project-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: .85rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .project-row:last-child { border-bottom: none; }
+  .project-row .title { font-weight: 600; }
+  .project-row .meta { color: var(--muted); font-size: .8rem; }
+  .project-row .actions button { margin-left: .5rem; }
+
+  .hint { color: var(--muted); font-size: .78rem; margin-top: .5rem; }
+  #status-msg { font-size: .85rem; margin-top: .8rem; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Manage Projects</h1>
+  <p class="sub">Add, edit, reorder, or remove projects — changes appear on the live site immediately, no redeploy needed.</p>
+
+  <div class="panel">
+    <h2 id="form-title">Add a project</h2>
+    <input type="hidden" id="project-id"/>
+
+    <label>Title</label>
+    <input type="text" id="f-title" placeholder="e.g. FreshWash"/>
+
+    <label>Description</label>
+    <textarea id="f-description" placeholder="Short description of what it does and the problem it solves."></textarea>
+
+    <div class="row">
+      <div>
+        <label>Icon (emoji)</label>
+        <input type="text" id="f-icon" placeholder="🔧" value="🔧"/>
+      </div>
+      <div>
+        <label>Badge</label>
+        <select id="f-badge">
+          <option>Live</option>
+          <option>Deployed</option>
+          <option>Hosted</option>
+          <option>WIP</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Tech stack (comma-separated)</label>
+    <input type="text" id="f-stack" placeholder="FastAPI, PostgreSQL, M-Pesa"/>
+
+    <div class="row">
+      <div>
+        <label>Live site URL</label>
+        <input type="text" id="f-live" placeholder="https://your-project.vercel.app"/>
+      </div>
+      <div>
+        <label>GitHub URL</label>
+        <input type="text" id="f-github" placeholder="https://github.com/you/repo"/>
+      </div>
+    </div>
+
+    <label>Sort order (lower shows first)</label>
+    <input type="number" id="f-order" value="0"/>
+
+    <div>
+      <button class="btn" id="save-btn" onclick="saveProject()">Save Project</button>
+      <button class="btn secondary" id="cancel-btn" onclick="resetForm()" style="display:none;">Cancel Edit</button>
+    </div>
+    <div id="status-msg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Current projects</h2>
+    <div id="project-list"><p class="hint">Loading…</p></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="admin-auth.js"></script>
+<script>
+  requireAdminLogin();
+
+  let projects = [];
+
+  async function loadProjects() {
+    const list = document.getElementById('project-list');
+    try {
+      const res = await fetch(`${API_URL}/projects`);
+      projects = await res.json();
+      renderList();
+    } catch (err) {
+      list.innerHTML = '<p class="hint">Could not load projects. Is the backend running?</p>';
+    }
+  }
+
+  function renderList() {
+    const list = document.getElementById('project-list');
+    if (!projects.length) {
+      list.innerHTML = '<p class="hint">No projects yet — add one above.</p>';
+      return;
+    }
+    list.innerHTML = projects.map(p => `
+      <div class="project-row">
+        <div>
+          <div class="title">${p.icon || ''} ${p.title}</div>
+          <div class="meta">${(p.tech_stack || []).join(', ')} · order ${p.sort_order}</div>
+        </div>
+        <div class="actions">
+          <button class="btn secondary" onclick="editProject(${p.id})">Edit</button>
+          <button class="btn danger" onclick="deleteProject(${p.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function editProject(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('form-title').textContent = 'Edit project';
+    document.getElementById('project-id').value = p.id;
+    document.getElementById('f-title').value = p.title;
+    document.getElementById('f-description').value = p.description;
+    document.getElementById('f-icon').value = p.icon || '🔧';
+    document.getElementById('f-badge').value = p.badge || 'Live';
+    document.getElementById('f-stack').value = (p.tech_stack || []).join(', ');
+    document.getElementById('f-live').value = p.live_url || '';
+    document.getElementById('f-github').value = p.github_url || '';
+    document.getElementById('f-order').value = p.sort_order || 0;
+    document.getElementById('cancel-btn').style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    document.getElementById('form-title').textContent = 'Add a project';
+    document.getElementById('project-id').value = '';
+    ['f-title','f-description','f-live','f-github'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-icon').value = '🔧';
+    document.getElementById('f-badge').value = 'Live';
+    document.getElementById('f-stack').value = '';
+    document.getElementById('f-order').value = 0;
+    document.getElementById('cancel-btn').style.display = 'none';
+  }
+
+  async function saveProject() {
+    const id = document.getElementById('project-id').value;
+    const payload = {
+      title: document.getElementById('f-title').value.trim(),
+      description: document.getElementById('f-description').value.trim(),
+      icon: document.getElementById('f-icon').value.trim() || '🔧',
+      badge: document.getElementById('f-badge').value,
+      tech_stack: document.getElementById('f-stack').value.split(',').map(s => s.trim()).filter(Boolean),
+      live_url: document.getElementById('f-live').value.trim() || null,
+      github_url: document.getElementById('f-github').value.trim() || null,
+      sort_order: parseInt(document.getElementById('f-order').value, 10) || 0,
+    };
+
+    if (!payload.title || !payload.description) {
+      setStatus('Title and description are required.', true);
+      return;
+    }
+
+    const url = id ? `${API_URL}/admin/projects/${id}` : `${API_URL}/admin/projects`;
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+      const res = await adminFetch(url, { method, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('save failed');
+      setStatus(id ? 'Project updated.' : 'Project added.', false);
+      resetForm();
+      loadProjects();
+    } catch (err) {
+      setStatus('Save failed — check your admin password and try again.', true);
+    }
+  }
+
+  async function deleteProject(id) {
+    if (!confirm('Delete this project? This cannot be undone.')) return;
+    try {
+      const res = await adminFetch(`${API_URL}/admin/projects/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+      loadProjects();
+    } catch (err) {
+      setStatus('Delete failed — check your admin password and try again.', true);
+    }
+  }
+
+  function setStatus(msg, isError) {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--danger)' : '#7fd88f';
+  }
+
+  loadProjects();
+</script>
+
+</body>
+</html>

@@ -838,99 +838,11 @@
 <section id="projects">
   <div class="section-label">Work</div>
   <h2>Real Projects</h2>
-  <div class="projects-grid">
-
-    <!-- Drumvale -->
-    <div class="project-card">
-      <div class="project-top">
-        <div class="project-icon">🏦</div>
-        <span class="project-badge">Live</span>
-      </div>
-      <h3>Drumvale Welfare Platform</h3>
-      <p class="desc">Full-stack chama management system — member registration, contribution tracking, M-Pesa STK Push payments, event management, attendance, and financial reporting with a five-tier RBAC system.</p>
-      <div class="project-stack">
-        <span class="stack-tag">FastAPI</span><span class="stack-tag">PostgreSQL</span>
-        <span class="stack-tag">JavaScript</span><span class="stack-tag">M-Pesa</span>
-        <span class="stack-tag">JWT Auth</span><span class="stack-tag">Render</span>
-      </div>
-      <div class="project-links">
-        <a href="https://drumvale-welfare.vercel.app" class="project-link" target="_blank">⟶ Live Site</a>
-        <a href="https://github.com/zadokmbiti-tech/drumvale-welfare" class="project-link" target="_blank">⟶ GitHub</a>
-      </div>
-    </div>
-
-    <!-- FreshWash -->
-    <div class="project-card">
-      <div class="project-top">
-        <div class="project-icon">🧺</div>
-        <span class="project-badge">Deployed</span>
-      </div>
-      <h3>FreshWash</h3>
-      <p class="desc">Laundry management system with M-Pesa Daraja STK Push payments, Africa's Talking SMS/USSD notifications, and PWA support. Deployed on Railway with a PostgreSQL backend.</p>
-      <div class="project-stack">
-        <span class="stack-tag">Django</span><span class="stack-tag">PostgreSQL</span>
-        <span class="stack-tag">M-Pesa</span><span class="stack-tag">Africa's Talking</span>
-        <span class="stack-tag">PWA</span><span class="stack-tag">Railway</span>
-      </div>
-      <div class="project-links">
-        <a href="https://freshwashsystem.up.railway.app" class="project-link" target="_blank">⟶ Live Site</a>
-        <a href="https://github.com/zadokmbiti-tech/laundry-system" class="project-link" target="_blank">⟶ GitHub</a>
-      </div>
-    </div>
-
-    <!-- Business Directory -->
-    <div class="project-card">
-      <div class="project-top">
-        <div class="project-icon">📁</div>
-        <span class="project-badge">Hosted</span>
-      </div>
-      <h3>Zaddy Business Directory</h3>
-      <p class="desc">PHP/MySQL business directory with operation hours, open/closed status badges, star ratings, dark-themed UI, and business CRUD with category search pages.</p>
-      <div class="project-stack">
-        <span class="stack-tag">PHP</span><span class="stack-tag">MySQL</span>
-        <span class="stack-tag">XAMPP</span><span class="stack-tag">CSS</span>
-        <span class="stack-tag">InfinityFree</span>
-      </div>
-      <div class="project-links">
-        <a href="http://zaddybusinessnetwork.kesug.com" class="project-link" target="_blank">⟶ Live Site</a>
-        <a href="https://github.com/zadokmbiti-tech/business-directory" class="project-link" target="_blank">⟶ GitHub</a>
-      </div>
-    </div>
-
-    <!--
-      ══════════════════════════════════════════════
-      ADD YOUR NEXT PROJECT HERE
-      Copy the block below, fill in your details,
-      and paste it before this comment block.
-      ══════════════════════════════════════════════
-
-    <div class="project-card">
-      <div class="project-top">
-        <div class="project-icon">🔧</div>
-        <span class="project-badge">Live</span>  ← or "WIP" / "Hosted"
-      </div>
-      <h3>Project Name</h3>
-      <p class="desc">
-        Short description of what it does and the problem it solves.
-      </p>
-      <div class="project-stack">
-        <span class="stack-tag">Tech 1</span>
-        <span class="stack-tag">Tech 2</span>
-      </div>
-      <div class="project-links">
-        <a href="https://your-live-link.com" class="project-link" target="_blank">⟶ Live Site</a>
-        <a href="https://github.com/yourrepo" class="project-link" target="_blank">⟶ GitHub</a>
-      </div>
-    </div>
-    -->
-
-    <!-- Placeholder — remove once you add your next project -->
-    <a href="https://github.com/zadokmbiti-tech" target="_blank" class="project-card add-card">
-      <div class="add-icon">+</div>
-      <div class="add-label">More Projects in Progress</div>
-      <div class="add-sub">New builds coming soon — visit my GitHub</div>
-    </a>
-
+  <!-- Cards are rendered from the /projects API — see the script near the
+       bottom of the page. Add, edit, or reorder projects from manage.html,
+       no more editing this markup by hand. -->
+  <div class="projects-grid" id="projects-grid">
+    <p style="color:var(--muted); grid-column:1/-1;">Loading projects…</p>
   </div>
 </section>
 
@@ -1011,6 +923,60 @@
 <footer>
   Designed &amp; built by <strong>Zadok Mutethia Mbiti</strong> · Kenya 🇰🇪 · 2026
 </footer>
+
+<script src="config.js"></script>
+<script>
+  // ── Load projects from the backend ──
+  // Falls back to a "visit my GitHub" card if the API is unreachable, so the
+  // section never renders empty (e.g. before the backend is deployed).
+  async function loadProjects() {
+    const grid = document.getElementById('projects-grid');
+    try {
+      const res = await fetch(`${API_URL}/projects`);
+      if (!res.ok) throw new Error('bad response');
+      const projects = await res.json();
+
+      if (!projects.length) {
+        grid.innerHTML = renderAddCard();
+        return;
+      }
+
+      grid.innerHTML = projects.map(renderProjectCard).join('') + renderAddCard();
+    } catch (err) {
+      grid.innerHTML = renderAddCard();
+    }
+  }
+
+  function renderProjectCard(p) {
+    const stack = (p.tech_stack || []).map(t => `<span class="stack-tag">${t}</span>`).join('');
+    const liveLink = p.live_url ? `<a href="${p.live_url}" class="project-link" target="_blank">⟶ Live Site</a>` : '';
+    const githubLink = p.github_url ? `<a href="${p.github_url}" class="project-link" target="_blank">⟶ GitHub</a>` : '';
+    return `
+      <div class="project-card fade-in">
+        <div class="project-top">
+          <div class="project-icon">${p.icon || '🔧'}</div>
+          <span class="project-badge">${p.badge || 'Live'}</span>
+        </div>
+        <h3>${p.title}</h3>
+        <p class="desc">${p.description}</p>
+        <div class="project-stack">${stack}</div>
+        <div class="project-links">${liveLink}${githubLink}</div>
+      </div>
+    `;
+  }
+
+  function renderAddCard() {
+    return `
+      <a href="https://github.com/zadokmbiti-tech" target="_blank" class="project-card add-card">
+        <div class="add-icon">+</div>
+        <div class="add-label">More Projects in Progress</div>
+        <div class="add-sub">New builds coming soon — visit my GitHub</div>
+      </a>
+    `;
+  }
+
+  loadProjects();
+</script>
 
 <script>
   // Scroll-triggered fade-in
