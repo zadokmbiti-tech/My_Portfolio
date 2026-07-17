@@ -926,10 +926,7 @@
 
 <script src="config.js"></script>
 <script>
-  // ── Load projects from the backend ──
-  // Falls back to a "visit my GitHub" card if the API is unreachable, so the
-  // section never renders empty (e.g. before the backend is deployed).
-  async function loadProjects() {
+async function loadProjects() {
     const grid = document.getElementById('projects-grid');
     try {
       const res = await fetch(`${API_URL}/projects`);
@@ -937,13 +934,13 @@
       const projects = await res.json();
 
       if (!projects.length) {
-        grid.innerHTML = renderAddCard();
+        grid.innerHTML = '<p style="color:var(--muted); grid-column:1/-1;">No projects yet — check back soon.</p>';
         return;
       }
 
-      grid.innerHTML = projects.map(renderProjectCard).join('') + renderAddCard();
+      grid.innerHTML = projects.map(renderProjectCard).join('');
     } catch (err) {
-      grid.innerHTML = renderAddCard();
+      grid.innerHTML = '<p style="color:var(--muted); grid-column:1/-1;">Could not load projects right now.</p>';
     }
   }
 
